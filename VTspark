@@ -1,0 +1,39 @@
+
+import virustotal
+from pyspark import SparkContext, SparkConf
+
+def query_virus_total(indicator):
+	# Pass indicator to virustotal API
+	v = virustotal.VirusTotal(API_KEY_HERE)
+	report = v.get(indicator)
+
+	# If there's known malware for indicator, return malware name
+	for antivirus, malware in report:
+	    if malware is not None:
+	        return malware
+	    else:
+	    	return "Not found"
+
+def main():
+	# Pass parameters for Spark Context
+	conf = SparkConf().setAppName(APPNAME).setMaster(master)
+	sc = SparkContext(conf=conf)
+
+	# Read parquet file from hdfs
+	pfile = sc.read.parquet("normal_and_suspicious_ips.parquet")
+
+	# Create Temp table in Spark
+	pfile.createOrReplaceTempView("pfile")
+
+	# Query for all IPs that have "suspicious" as classification
+	suspicious_ips = spark.sql("SELECT ip FROM pfile WHERE classification == 'suspicious'")
+
+	# Use lambda function to identify all suspicious IPs associated with known malware
+	known_suspicious_ips = suspicious_ips.map(lambda ip: query_virus_total(ip))
+
+	# Display table
+	known_suspicious_ips.show()
+
+if __name__ == '__main__':
+	main()
+
